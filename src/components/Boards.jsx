@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
-import BoardDetailModal from './BoardDetailModal';
+import { memo, useCallback, useState } from 'react';
+import { useDroppable } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import clsx from 'clsx';
 import { useBoardStore } from '../store';
+import BoardDetailModal from './BoardDetailModal';
 import BoardConfirmModal from './BoardConfirmModal';
 import BoardEditModal from './BoardEditModal';
+import BoardItem from './BoardItem';
 
 const typeToKorean = (type) => {
   switch (type) {
@@ -17,7 +21,14 @@ const typeToKorean = (type) => {
   }
 };
 
-const Boards = ({ type }) => {
+const Boards = memo(function Boards({ type }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: type,
+    data: {
+      type,
+      accepts: ['todo', 'inprogress', 'done'],
+    },
+  });
   const { data } = useBoardStore();
   const filteredData = data.filter((item) => item.type === type);
   const [item, setItem] = useState(null);
@@ -27,10 +38,10 @@ const Boards = ({ type }) => {
   const [selectedId, setSelectedId] = useState(null);
 
   // Detail Modal
-  const handleModalOpen = (item) => {
+  const handleModalOpen = useCallback((item) => {
     setItem(item);
     setIsOpen(true);
-  };
+  }, []);
   const handleModalClose = () => {
     setItem(null);
     setIsOpen(false);
@@ -57,26 +68,23 @@ const Boards = ({ type }) => {
   };
 
   return (
-    <div className="w-full flex flex-col">
+    <div
+      className={clsx('w-full flex flex-col', isOver && 'bg-slate-200 rounded-md ring-2 ring-slate-400 ring-inset')}
+      ref={setNodeRef}
+    >
       <div className="w-full h-[60px] bg-stone-200 rounded-sm flex items-center justify-center">
         <p className="text-lg font-semibold">{typeToKorean(type)}</p>
       </div>
-      <div className="flex flex-col gap-2 p-4">
-        {filteredData.map((item) => (
-          <div
-            onClick={() => handleModalOpen(item)}
-            key={item.id}
-            className="bg-white hover:bg-stone-100 shadow-md rounded-md p-4 cursor-pointer"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">{item.title}</h3>
-              {item.type === 'todo' && <div className="animate-pulse w-2 h-2 rounded-full bg-green-500"></div>}
-              {item.type === 'inprogress' && <div className="animate-pulse w-2 h-2 rounded-full bg-amber-500"></div>}
-              {item.type === 'done' && <div className="animate-pulse w-2 h-2 rounded-full bg-red-500"></div>}
+      <div className="flex flex-col gap-2 p-4 min-h-[300px]">
+        <SortableContext items={filteredData} strategy={verticalListSortingStrategy}>
+          {filteredData.length === 0 ? (
+            <div className="min-h-[300px] border-2 border-dashed border-slate-300 rounded-md flex items-center justify-center text-slate-400">
+              이 영역으로 항목을 드래그하세요
             </div>
-            <p className="text-sm text-gray-500">{item.created_at}</p>
-          </div>
-        ))}
+          ) : (
+            filteredData.map((item) => <BoardItem key={item.id} item={item} onClick={handleModalOpen} />)
+          )}
+        </SortableContext>
       </div>
       {isOpen && (
         <BoardDetailModal
@@ -90,6 +98,6 @@ const Boards = ({ type }) => {
       {editIsOpen && <BoardEditModal onClose={handleEditModalClose} item={item} />}
     </div>
   );
-};
+});
 
 export default Boards;
